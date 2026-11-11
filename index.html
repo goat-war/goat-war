@@ -82,7 +82,7 @@
   <div class="warn">⏰ <b>The whole war lasts only 3 days.</b> It ends <b>Saturday 14 Nov 2026, 13:04 WIB (06:04 UTC)</b>. When the countdown hits zero, claiming and buying close forever — and the winning side splits every unclaimed free share.</div>
 
   <div class="panel">
-    <h2>⚽ THE SCOREBOARD <span class="livedot">●</span> <span style="font-size:11px;color:var(--dim)">LIVE — refreshes automatically</span></h2>
+    <h2>⚽ THE SCOREBOARD <span class="livedot">●</span> <span id="updNote" style="font-size:11px;color:var(--dim)">LIVE — refreshes automatically</span></h2>
     <div class="vsrow"><span class="vsname r">🔴 CR7 · RONALDO</span><span id="winTagR"></span><span class="vscount" id="cntR">…</span></div>
     <div class="vsbar"><div class="fr" id="barR" style="width:50%"></div><div class="fm" id="barM" style="width:50%"></div></div>
     <div class="vsrow"><span class="vsname m">🔵 MESSI</span><span id="winTagM"></span><span class="vscount" id="cntM">…</span></div>
@@ -202,7 +202,7 @@
 const CONTRACT = "0x7e65aA61C10249A094cc42ccDd0F2c234DF987dC";
 const WC_PROJECT_ID = "ff5985647ed78916bed0155d2ff84a1c";
 const SITE = location.origin;
-const RPCS = ["https://bsc-dataseed.binance.org", "https://bsc-dataseed1.binance.org", "https://bsc-rpc.publicnode.com"];
+const RPCS = ["https://bsc-dataseed.binance.org", "https://bsc-dataseed1.binance.org", "https://bsc-dataseed2.binance.org", "https://bsc-dataseed3.binance.org", "https://bsc-rpc.publicnode.com"];
 const SEL = { status: "0x200d2ed2", freeUsed: "0x2626c4bf", sideOf: "0xdc61fddb",
               balanceOf: "0x70a08231", scoreShares: "0x6ff4b176",
               claimFree: "0x29280d3e", buy: "0xe90bc7b1", claimWinBonus: "0x24a8e7a4" };
@@ -250,8 +250,10 @@ setSide(1);
 async function rpc(method, params) {
   for (const url of RPCS) {
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctl.signal,
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+      clearTimeout(to);
       const j = await r.json();
       if (j.result !== undefined) return j.result;
     } catch (e) { /* try next */ }
@@ -265,6 +267,7 @@ const padAddr = a => a.toLowerCase().replace("0x", "").padStart(64, "0");
 const fmtBNB = wei => (Number(wei) / 1e18).toFixed(4).replace(/0+$/, "").replace(/\.$/, ".0");
 
 async function refresh() {
+ try {
   const h = await call(SEL.status);
   const freeUsed = Number(word(h, 0)), claims = Number(word(h, 1)), paidSold = Number(word(h, 2));
   const cr7 = Number(word(h, 3)), messi = Number(word(h, 4));
@@ -283,6 +286,8 @@ async function refresh() {
   $("winTagM").innerHTML = messi > cr7 ? '<span class="winTag">LEADING</span>' : "";
   updateButtons();
   if (account) await refreshMine();
+  const el = $("updNote"); if (el) el.textContent = "LIVE · updated " + new Date().toLocaleTimeString();
+ } catch (e) { const el = $("updNote"); if (el) el.textContent = "connection hiccup — retrying…"; }
 }
 function tick() {
   if (!saleEnd) return;
@@ -444,8 +449,8 @@ $("bonusBtn").onclick = async () => {
   } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
 };
 
-refresh().then(() => { tick(); setInterval(tick, 1000); setInterval(refresh, 30000); })
-  .catch(() => { $("stTimer").textContent = "…"; });
+tick(); setInterval(tick, 1000);
+refresh(); setInterval(refresh, 15000);
 $("jsState").textContent = "page JS OK · gate: agent-channel vote · window: 3 days · chain: BSC 56";
 </script>
 </body>
